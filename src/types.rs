@@ -28,14 +28,6 @@ fn hex_to_bytes(num: MagicBytes) -> [u8; 4] {
     [b1, b2, b3, b4]
 }
 
-struct NodeInformation {
-    services: [u8; 8],
-    ip_address: [u8; 16],
-    ip_port: [u8; 2],
-}
-
-// ----------
-
 pub trait Endianess {}
 
 #[derive(Debug)]
@@ -81,6 +73,3 @@ macro_rules! impl_uint {
 impl_uint!(8, u64, LittleEndian);
 impl_uint!(4, u32, LittleEndian);
 impl_uint!(4, u32, BigEndian);
-//impl_uint!(8, u64, LittleEndian);
-//impl_uint!(2, u16, BigEndian);
-//impl_uint!(8, u64, BigEndian);
