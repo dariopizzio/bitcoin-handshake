@@ -46,6 +46,7 @@ fn hex_to_bytes(num: MagicBytes) -> [u8; 4] {
 pub enum HeaderCommand {
     VERSION,
     VERACK,
+    SENDCMPCT,
 }
 
 impl FromStr for HeaderCommand {
@@ -55,6 +56,7 @@ impl FromStr for HeaderCommand {
         match s {
             "version" => Ok(HeaderCommand::VERSION),
             "verack" => Ok(HeaderCommand::VERACK),
+            "sendcmpct" => Ok(HeaderCommand::SENDCMPCT),
             _ => Err(()),
         }
     }
@@ -65,6 +67,7 @@ impl ToBytes<12> for HeaderCommand {
         match self {
             HeaderCommand::VERSION => get_field::<12>("version".as_bytes()),
             HeaderCommand::VERACK => get_field::<12>("verack".as_bytes()),
+            HeaderCommand::SENDCMPCT => get_field::<12>("sendcmpct".as_bytes()),
         }
     }
 }
@@ -82,6 +85,7 @@ impl Display for HeaderCommand {
         match self {
             HeaderCommand::VERSION => write!(f, "version"),
             HeaderCommand::VERACK => write!(f, "verack"),
+            HeaderCommand::SENDCMPCT => write!(f, "sendcmpct"),
         }
     }
 }
