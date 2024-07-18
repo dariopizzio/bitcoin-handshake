@@ -1,6 +1,4 @@
-use core::time;
-use std::io::{BufRead, BufReader};
-use std::thread;
+use std::io::{BufRead, BufReader, BufWriter};
 use std::{
     io::{Read, Write},
     net::TcpStream,
@@ -19,6 +17,8 @@ const REMOTE_IP: &str = "52.15.138.15";
 const LOCAL_IP: &str = "127.0.0.1";
 const MAINNET_PORT: u16 = 8333;
 
+const HEADER_MESSAGE_LENGHT: usize = 24;
+
 fn main() {
     let mut tcp_stream = TcpStream::connect(format!("{REMOTE_IP}:{MAINNET_PORT}")).unwrap();
 
@@ -26,53 +26,62 @@ fn main() {
     let version_header =
         get_version_message_header(HeaderCommand::VERSION, &payload_message.to_bytes());
 
-    tcp_stream
-        .write(&version_header.to_bytes())
-        .expect("expect");
-    tcp_stream
-        .write(&payload_message.to_bytes())
-        .expect("expect");
+    println!("## SEND VERSION HEADER & PAYLOAD");
+    write_bytes(&tcp_stream, &version_header.to_bytes());
+    write_bytes(&tcp_stream, &payload_message.to_bytes());
 
-    thread::sleep(time::Duration::from_secs(2));
-    println!("after sleep");
+    println!("## READ VERSION HEADER");
+    let mut buffer = [0u8; HEADER_MESSAGE_LENGHT];
+    read_bytes(&mut tcp_stream, &mut buffer);
 
-    // Read version message
-    let mut buf_read = [0u8; 24];
-    let size = tcp_stream.read(&mut buf_read).expect("expect");
-    println!("resp size: {size}");
-    println!("RESPONSE: {buf_read:?}");
+    let received_message = MessageHeader::from_bytes(buffer);
+    println!("parsed received message: {received_message:?}");
 
-    let received_message = MessageHeader::from_bytes(buf_read);
-    println!("received message: {received_message:?}");
-
-    // Read payload message
+    println!("## READ VERSION PAYLOAD");
     let size = u32::from_le_bytes(received_message.size.to_bytes());
-    println!("expected_size: {size}");
 
     let mut br = BufReader::new(&tcp_stream);
-    let buf_read = br.fill_buf().unwrap();
-    println!("RESPONSE: {buf_read:?}");
+    let buffer = br.fill_buf().unwrap();
+    println!("Size: {size} | Response: {buffer:?}");
 
-    let received_message = VersionMessagePayload::from_bytes(buf_read.to_vec());
-    println!("received message: {received_message:?}");
+    let received_message = VersionMessagePayload::from_bytes(buffer.to_vec());
+    println!("parsed received message: {received_message:?}");
 
     // Consume the payload from the buffer
     br.consume(size as usize);
 
-    // Read Verack
-    let mut buf_read_verack = [0u8; 24];
-    let read_size = br.read(&mut buf_read_verack).unwrap();
-    println!("verack size: {read_size}");
-    let received_message = MessageHeader::from_bytes(buf_read_verack);
-    println!("VERACK: {received_message:?}");
+    println!("## READ VERACK HEADER");
+    let mut buffer = [0u8; HEADER_MESSAGE_LENGHT];
+    read_bytes(&mut tcp_stream, &mut buffer);
 
+    let received_message = MessageHeader::from_bytes(buffer);
+    println!("parsed received message: {received_message:?}");
+
+    println!("## SEND VERACK HEADER");
     let version_header = get_version_message_header(HeaderCommand::VERACK, &vec![]);
 
-    tcp_stream
-        .write(&version_header.to_bytes())
-        .expect("expect");
+    write_bytes(&tcp_stream, &version_header.to_bytes());
 
     println!("HANDSHAKE COMPLETED!");
+
+    println!("## READ NEW HEADER MESSAGE");
+    let mut buffer = [0u8; HEADER_MESSAGE_LENGHT];
+    read_bytes(&mut tcp_stream, &mut buffer);
+
+    let received_message = MessageHeader::from_bytes(buffer);
+    println!("parsed received message: {received_message:?}");
+}
+
+fn read_bytes(tcp_stream: &mut TcpStream, buffer: &mut [u8; 24]) -> usize {
+    // TODO use BufReader
+    let size = tcp_stream.read(buffer).expect("expect");
+    println!("Size: {size} | Response: {buffer:?}");
+    size
+}
+
+fn write_bytes(tcp_stream: &TcpStream, bytes: &Vec<u8>) {
+    let mut buf_writer = BufWriter::new(tcp_stream);
+    buf_writer.write(bytes).expect("write");
 }
 
 fn get_version_message_header(command: HeaderCommand, payload: &Vec<u8>) -> MessageHeader {
