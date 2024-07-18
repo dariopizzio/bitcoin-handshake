@@ -1,5 +1,7 @@
 use std::io::Write;
 
+use sha2::{Digest, Sha256};
+
 use crate::types::{BigEndian, LittleEndian, NodeInformation, UInt};
 
 #[derive(Debug)]
@@ -164,4 +166,19 @@ impl VersionMessagePayload {
             //add relay field as optional
         }
     }
+}
+
+/// Given a payload returns its checksum
+///
+/// To get the checksum, you need to double hash the payload
+/// and take the first 4 bytes
+pub fn get_checksum(payload: &Vec<u8>) -> UInt<BigEndian, 4> {
+    let mut hasher = Sha256::new();
+    hasher.update(&payload);
+    let hash1 = hasher.finalize();
+
+    let mut hasher = Sha256::new();
+    hasher.update(&hash1);
+    let checksum: [u8; 4] = hasher.finalize()[..4].try_into().unwrap(); // first 4 bytes
+    UInt::<BigEndian, 4>::from_be_bytes(checksum) // TODO check BigEndian vs LittleEndian
 }

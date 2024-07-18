@@ -1,10 +1,12 @@
 use std::{marker::PhantomData, net::Ipv4Addr, str::FromStr};
 
-enum MagicBytes {
+//const HEADER_MAGIC_BYTES: [u8; 4] = [0xf9, 0xbe, 0xb4, 0xd9];
+
+pub enum MagicBytes {
     MAINNET = 0xF9BEB4D9,
 }
 
-trait ToBytes<const N: usize> {
+pub trait ToBytes<const N: usize> {
     fn to_bytes(&self) -> [u8; N];
 }
 
@@ -19,10 +21,10 @@ impl ToBytes<4> for MagicBytes {
 fn hex_to_bytes(num: MagicBytes) -> [u8; 4] {
     let num = num as u32;
     let (b1, b2, b3, b4): (u8, u8, u8, u8) = (
-        (num & 0x000000FF) as u8,
-        (num >> 8 & 0x000000FF) as u8,
-        (num >> 16 & 0x000000FF) as u8,
         (num >> 24 & 0x000000FF) as u8,
+        (num >> 16 & 0x000000FF) as u8,
+        (num >> 8 & 0x000000FF) as u8,
+        (num & 0x000000FF) as u8,
     );
 
     [b1, b2, b3, b4]

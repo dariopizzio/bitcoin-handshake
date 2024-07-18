@@ -7,22 +7,23 @@ use std::{
 };
 
 use chrono::Utc;
-use messages::{MessageHeader, VersionMessagePayload};
-use sha2::{Digest, Sha256};
-use types::{BigEndian, LittleEndian, NodeInformation, UInt};
+use messages::{get_checksum, MessageHeader, VersionMessagePayload};
+use types::{LittleEndian, MagicBytes, NodeInformation, ToBytes, UInt};
 
 mod messages;
 mod types;
 
-const HEADER_MAGIC_BYTES: [u8; 4] = [0xf9, 0xbe, 0xb4, 0xd9];
 const HEADER_COMMAND_VERSION: &str = "version";
 const PROTOCOL_VERSION: u32 = 70015;
 
-fn main() {
-    let remote_ip = "52.15.138.15";
-    let mut tcp_stream = TcpStream::connect(format!("{}:8333", remote_ip)).unwrap();
+const REMOTE_IP: &str = "52.15.138.15";
+const LOCAL_IP: &str = "127.0.0.1";
+const MAINNET_PORT: u16 = 8333;
 
-    let payload_message = get_payload_message_header(remote_ip);
+fn main() {
+    let mut tcp_stream = TcpStream::connect(format!("{REMOTE_IP}:{MAINNET_PORT}")).unwrap();
+
+    let payload_message = get_payload_message_header();
     println!("payload_message: {payload_message:?}");
 
     let version_header = get_version_message_header(&payload_message.to_bytes());
@@ -67,26 +68,18 @@ fn get_version_message_header(payload: &Vec<u8>) -> MessageHeader {
     let size = payload.len() as u32;
     let size = UInt::<LittleEndian, 4>::new(size);
 
-    // Double hashing
-    let mut hasher = Sha256::new();
-    hasher.update(&payload);
-    let hash1 = hasher.finalize();
+    let checksum = get_checksum(payload);
 
-    let mut hasher = Sha256::new();
-    hasher.update(&hash1);
-    let checksum: [u8; 4] = hasher.finalize()[..4].try_into().unwrap(); // first 4 bytes
-    let checksum = UInt::<BigEndian, 4>::from_be_bytes(checksum); // TODO check BigEndian vs LittleEndian
-
-    MessageHeader::new(HEADER_MAGIC_BYTES, command, size, checksum)
+    MessageHeader::new(MagicBytes::MAINNET.to_bytes(), command, size, checksum)
 }
 
-fn get_payload_message_header(remote_ip: &str) -> VersionMessagePayload {
+fn get_payload_message_header() -> VersionMessagePayload {
     let protocol_version = UInt::<LittleEndian, 4>::new(PROTOCOL_VERSION);
     let services: [u8; 8] = [0; 8];
     let epoch_time = Utc::now().timestamp();
     let time = UInt::<LittleEndian, 8>::new(epoch_time as u64);
-    let recv_node_information = NodeInformation::new(0, remote_ip, 8333);
-    let trans_node_information = NodeInformation::new(0, "127.0.0.1", 8333);
+    let recv_node_information = NodeInformation::new(0, REMOTE_IP, MAINNET_PORT);
+    let trans_node_information = NodeInformation::new(0, LOCAL_IP, MAINNET_PORT);
     let nonce = UInt::<LittleEndian, 8>::new(0);
     let user_agent: [u8; 1] = [0; 1];
     let last_block = UInt::<LittleEndian, 4>::new(0);
