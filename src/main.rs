@@ -3,14 +3,13 @@ use std::io::{BufRead, BufReader};
 use std::thread;
 use std::{
     io::{Read, Write},
-    net::{Ipv4Addr, TcpStream},
-    str::FromStr,
+    net::TcpStream,
 };
 
 use chrono::Utc;
 use messages::{MessageHeader, VersionMessagePayload};
 use sha2::{Digest, Sha256};
-use types::{BigEndian, LittleEndian, UInt};
+use types::{BigEndian, LittleEndian, NodeInformation, UInt};
 
 mod messages;
 mod types;
@@ -83,48 +82,21 @@ fn get_version_message_header(payload: &Vec<u8>) -> MessageHeader {
 
 fn get_payload_message_header(remote_ip: &str) -> VersionMessagePayload {
     let protocol_version = UInt::<LittleEndian, 4>::new(PROTOCOL_VERSION);
-
     let services: [u8; 8] = [0; 8];
-
     let epoch_time = Utc::now().timestamp();
-    let time = epoch_time.to_le_bytes();
-
-    let remote_service: u32 = 0;
-    let remote_service = remote_service.to_le_bytes();
-    let remote_service = get_field::<8>(&remote_service);
-
-    let remote_ip = Ipv4Addr::from_str(remote_ip).expect("Error parsing IP");
-    let remote_ip = remote_ip.to_ipv6_mapped();
-    let remote_ip = remote_ip.octets().map(|b| b.to_be());
-
-    let remote_port: u16 = 8333;
-    let remote_port = remote_port.to_be_bytes();
-
-    let local_service: [u8; 8] = [0; 8];
-
-    let local_ip = Ipv4Addr::from_str("127.0.0.1").expect("Error parsing IP");
-    let local_ip = local_ip.to_ipv6_mapped();
-    let local_ip = local_ip.octets().map(|b| b.to_be());
-
-    let local_port: u16 = 8333;
-    let local_port = local_port.to_be_bytes();
-
+    let time = UInt::<LittleEndian, 8>::new(epoch_time as u64);
+    let recv_node_information = NodeInformation::new(0, remote_ip, 8333);
+    let trans_node_information = NodeInformation::new(0, "127.0.0.1", 8333);
     let nonce = UInt::<LittleEndian, 8>::new(0);
-
     let user_agent: [u8; 1] = [0; 1];
-
     let last_block = UInt::<LittleEndian, 4>::new(0);
 
     VersionMessagePayload::new(
         protocol_version,
         services,
         time,
-        remote_service,
-        remote_ip,
-        remote_port,
-        local_service,
-        local_ip,
-        local_port,
+        recv_node_information,
+        trans_node_information,
         nonce,
         user_agent,
         "".to_string(),
@@ -132,6 +104,7 @@ fn get_payload_message_header(remote_ip: &str) -> VersionMessagePayload {
     )
 }
 
+// TODO remove
 pub fn get_field<const N: usize>(bytes: &[u8]) -> [u8; N] {
     let mut field: [u8; N] = [0; N];
     field[0..bytes.len()].copy_from_slice(bytes);

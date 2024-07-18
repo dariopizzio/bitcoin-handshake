@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{marker::PhantomData, net::Ipv4Addr, str::FromStr};
 
 enum MagicBytes {
     MAINNET = 0xF9BEB4D9,
@@ -26,6 +26,38 @@ fn hex_to_bytes(num: MagicBytes) -> [u8; 4] {
     );
 
     [b1, b2, b3, b4]
+}
+
+#[derive(Debug)]
+pub struct NodeInformation {
+    pub services: UInt<LittleEndian, 8>,
+    pub ip_address: UInt<BigEndian, 16>,
+    pub port: UInt<BigEndian, 2>,
+}
+
+impl NodeInformation {
+    pub fn new(services: u64, ip_address: &str, port: u16) -> Self {
+        let ip_address = Ipv4Addr::from_str(ip_address)
+            .unwrap()
+            .to_ipv6_mapped()
+            .octets(); // TODO .octets().map(|b| b.to_be());
+        Self {
+            services: UInt::<LittleEndian, 8>::new(services),
+            ip_address: UInt::<BigEndian, 16>::from_be_bytes(ip_address),
+            port: UInt::<BigEndian, 2>::new(port),
+        }
+    }
+    pub fn from_bytes(
+        services: UInt<LittleEndian, 8>,
+        ip_address: UInt<BigEndian, 16>,
+        port: UInt<BigEndian, 2>,
+    ) -> Self {
+        Self {
+            services,
+            ip_address,
+            port,
+        }
+    }
 }
 
 pub trait Endianess {}
@@ -70,6 +102,8 @@ macro_rules! impl_uint {
     };
 }
 
-impl_uint!(8, u64, LittleEndian);
+impl_uint!(2, u16, BigEndian);
 impl_uint!(4, u32, LittleEndian);
 impl_uint!(4, u32, BigEndian);
+impl_uint!(8, u64, LittleEndian);
+impl_uint!(16, u128, BigEndian);

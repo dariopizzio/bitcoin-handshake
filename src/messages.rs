@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::types::{BigEndian, LittleEndian, UInt};
+use crate::types::{BigEndian, LittleEndian, NodeInformation, UInt};
 
 #[derive(Debug)]
 pub struct MessageHeader {
@@ -55,13 +55,9 @@ impl MessageHeader {
 pub struct VersionMessagePayload {
     protocol_version: UInt<LittleEndian, 4>,
     services: [u8; 8],
-    timestamp: [u8; 8],
-    addr_recv_services: [u8; 8],
-    addr_recv_ip_address: [u8; 16],
-    addr_recv_ip_port: [u8; 2],
-    addr_trans_services: [u8; 8],
-    addr_trans_ip_address: [u8; 16],
-    addr_trans_ip_port: [u8; 2],
+    timestamp: UInt<LittleEndian, 8>,
+    recv_node_information: NodeInformation,
+    trans_node_information: NodeInformation,
     nonce: UInt<LittleEndian, 8>,
     user_agent_size: [u8; 1],
     user_agent: String,
@@ -72,13 +68,9 @@ impl VersionMessagePayload {
     pub fn new(
         protocol_version: UInt<LittleEndian, 4>,
         services: [u8; 8],
-        timestamp: [u8; 8],
-        addr_recv_services: [u8; 8],
-        addr_recv_ip_address: [u8; 16],
-        addr_recv_ip_port: [u8; 2],
-        addr_trans_services: [u8; 8],
-        addr_trans_ip_address: [u8; 16],
-        addr_trans_ip_port: [u8; 2],
+        timestamp: UInt<LittleEndian, 8>,
+        recv_node_information: NodeInformation,
+        trans_node_information: NodeInformation,
         nonce: UInt<LittleEndian, 8>,
         user_agent_size: [u8; 1],
         user_agent: String,
@@ -88,12 +80,8 @@ impl VersionMessagePayload {
             protocol_version,
             services,
             timestamp,
-            addr_recv_services,
-            addr_recv_ip_address,
-            addr_recv_ip_port,
-            addr_trans_services,
-            addr_trans_ip_address,
-            addr_trans_ip_port,
+            recv_node_information,
+            trans_node_information,
             nonce,
             user_agent_size,
             user_agent,
@@ -104,16 +92,27 @@ impl VersionMessagePayload {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut message: Vec<u8> = vec![];
         // TODO ok()
-
         message.write(&self.protocol_version.to_bytes()).ok();
         message.write(&self.services).ok();
-        message.write(&self.timestamp).ok();
-        message.write(&self.addr_recv_services).ok();
-        message.write(&self.addr_recv_ip_address).ok();
-        message.write(&self.addr_recv_ip_port).ok();
-        message.write(&self.addr_trans_services).ok();
-        message.write(&self.addr_trans_ip_address).ok();
-        message.write(&self.addr_trans_ip_port).ok();
+        message.write(&self.timestamp.to_bytes()).ok();
+        message
+            .write(&self.recv_node_information.services.to_bytes())
+            .ok();
+        message
+            .write(&self.recv_node_information.ip_address.to_bytes())
+            .ok();
+        message
+            .write(&self.recv_node_information.port.to_bytes())
+            .ok();
+        message
+            .write(&self.trans_node_information.services.to_bytes())
+            .ok();
+        message
+            .write(&self.trans_node_information.ip_address.to_bytes())
+            .ok();
+        message
+            .write(&self.trans_node_information.port.to_bytes())
+            .ok();
         message.write(&self.nonce.to_bytes()).ok();
         message.write(&self.user_agent_size).ok();
 
@@ -129,19 +128,28 @@ impl VersionMessagePayload {
         let user_agent_size: [u8; 1] = message[80..81].try_into().expect("Don't fail");
         let size = i8::from_le_bytes(user_agent_size);
         let end_user_agent = 81 + size as usize;
+
+        let recv_node_information = NodeInformation::from_bytes(
+            UInt::<LittleEndian, 8>::from_le_bytes(message[20..28].try_into().expect("Don't fail")),
+            UInt::<BigEndian, 16>::from_be_bytes(message[28..44].try_into().expect("Don't fail")),
+            UInt::<BigEndian, 2>::from_be_bytes(message[44..46].try_into().expect("Don't fail")),
+        );
+        let trans_node_information = NodeInformation::from_bytes(
+            UInt::<LittleEndian, 8>::from_le_bytes(message[46..54].try_into().expect("Don't fail")),
+            UInt::<BigEndian, 16>::from_be_bytes(message[54..70].try_into().expect("Don't fail")),
+            UInt::<BigEndian, 2>::from_be_bytes(message[70..72].try_into().expect("Don't fail")),
+        );
         Self {
             // TODO expect
             protocol_version: UInt::<LittleEndian, 4>::from_le_bytes(
                 message[0..4].try_into().expect("Don't fail"),
             ),
             services: message[4..12].try_into().expect("Don't fail"),
-            timestamp: message[12..20].try_into().expect("Don't fail"),
-            addr_recv_services: message[20..28].try_into().expect("Don't fail"),
-            addr_recv_ip_address: message[28..44].try_into().expect("Don't fail"),
-            addr_recv_ip_port: message[44..46].try_into().expect("Don't fail"),
-            addr_trans_services: message[46..54].try_into().expect("Don't fail"),
-            addr_trans_ip_address: message[54..70].try_into().expect("Don't fail"),
-            addr_trans_ip_port: message[70..72].try_into().expect("Don't fail"),
+            timestamp: UInt::<LittleEndian, 8>::from_le_bytes(
+                message[12..20].try_into().expect("Don't fail"),
+            ),
+            recv_node_information,
+            trans_node_information,
             nonce: UInt::<LittleEndian, 8>::from_le_bytes(
                 message[72..80].try_into().expect("Don't fail"),
             ),
