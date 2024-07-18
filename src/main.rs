@@ -8,12 +8,11 @@ use std::{
 
 use chrono::Utc;
 use messages::{get_checksum, MessageHeader, VersionMessagePayload};
-use types::{LittleEndian, MagicBytes, NodeInformation, ToBytes, UInt};
+use types::{HeaderCommand, LittleEndian, MagicBytes, NodeInformation, UInt};
 
 mod messages;
 mod types;
 
-const HEADER_COMMAND_VERSION: &str = "version";
 const PROTOCOL_VERSION: u32 = 70015;
 
 const REMOTE_IP: &str = "52.15.138.15";
@@ -24,10 +23,8 @@ fn main() {
     let mut tcp_stream = TcpStream::connect(format!("{REMOTE_IP}:{MAINNET_PORT}")).unwrap();
 
     let payload_message = get_payload_message_header();
-    println!("payload_message: {payload_message:?}");
-
-    let version_header = get_version_message_header(&payload_message.to_bytes());
-    println!("version_header: {version_header:?}");
+    let version_header =
+        get_version_message_header(HeaderCommand::VERSION, &payload_message.to_bytes());
 
     tcp_stream
         .write(&version_header.to_bytes())
@@ -52,25 +49,38 @@ fn main() {
     let size = u32::from_le_bytes(received_message.size.to_bytes());
     println!("expected_size: {size}");
 
-    let mut br = BufReader::new(tcp_stream);
+    let mut br = BufReader::new(&tcp_stream);
     let buf_read = br.fill_buf().unwrap();
-    println!("resp size: {size}");
     println!("RESPONSE: {buf_read:?}");
 
     let received_message = VersionMessagePayload::from_bytes(buf_read.to_vec());
     println!("received message: {received_message:?}");
+
+    // Consume the payload from the buffer
+    br.consume(size as usize);
+
+    // Read Verack
+    let mut buf_read_verack = [0u8; 24];
+    let read_size = br.read(&mut buf_read_verack).unwrap();
+    println!("verack size: {read_size}");
+    let received_message = MessageHeader::from_bytes(buf_read_verack);
+    println!("VERACK: {received_message:?}");
+
+    let version_header = get_version_message_header(HeaderCommand::VERACK, &vec![]);
+
+    tcp_stream
+        .write(&version_header.to_bytes())
+        .expect("expect");
+
+    println!("HANDSHAKE COMPLETED!");
 }
 
-fn get_version_message_header(payload: &Vec<u8>) -> MessageHeader {
-    let mut command: [u8; 12] = [0; 12];
-    command[0..7].copy_from_slice(HEADER_COMMAND_VERSION.as_bytes());
-
+fn get_version_message_header(command: HeaderCommand, payload: &Vec<u8>) -> MessageHeader {
     let size = payload.len() as u32;
     let size = UInt::<LittleEndian, 4>::new(size);
-
     let checksum = get_checksum(payload);
 
-    MessageHeader::new(MagicBytes::MAINNET.to_bytes(), command, size, checksum)
+    MessageHeader::new(MagicBytes::MAINNET, command, size, checksum)
 }
 
 fn get_payload_message_header() -> VersionMessagePayload {
@@ -95,11 +105,4 @@ fn get_payload_message_header() -> VersionMessagePayload {
         "".to_string(),
         last_block,
     )
-}
-
-// TODO remove
-pub fn get_field<const N: usize>(bytes: &[u8]) -> [u8; N] {
-    let mut field: [u8; N] = [0; N];
-    field[0..bytes.len()].copy_from_slice(bytes);
-    field
 }

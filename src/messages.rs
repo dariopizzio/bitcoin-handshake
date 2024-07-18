@@ -2,20 +2,22 @@ use std::io::Write;
 
 use sha2::{Digest, Sha256};
 
-use crate::types::{BigEndian, LittleEndian, NodeInformation, UInt};
+use crate::types::{
+    BigEndian, FromBytes, HeaderCommand, LittleEndian, MagicBytes, NodeInformation, ToBytes, UInt,
+};
 
 #[derive(Debug)]
 pub struct MessageHeader {
-    magic_bytes: [u8; 4],
-    command: [u8; 12],
+    magic_bytes: MagicBytes,
+    command: HeaderCommand,
     pub size: UInt<LittleEndian, 4>,
     checksum: UInt<BigEndian, 4>,
 }
 
 impl MessageHeader {
     pub fn new(
-        magic_bytes: [u8; 4],
-        command: [u8; 12],
+        magic_bytes: MagicBytes,
+        command: HeaderCommand,
         size: UInt<LittleEndian, 4>,
         checksum: UInt<BigEndian, 4>,
     ) -> Self {
@@ -30,8 +32,8 @@ impl MessageHeader {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut message: Vec<u8> = vec![];
         // TODO ok()
-        message.write(&self.magic_bytes).ok();
-        message.write(&self.command).ok();
+        message.write(&self.magic_bytes.to_bytes()).ok();
+        message.write(&self.command.to_bytes()).ok();
         message.write(&self.size.to_bytes()).ok();
         message.write(&self.checksum.to_bytes()).ok();
 
@@ -41,8 +43,8 @@ impl MessageHeader {
     pub fn from_bytes(message: [u8; 24]) -> Self {
         Self {
             // TODO expect
-            magic_bytes: message[0..4].try_into().expect("Don't fail"),
-            command: message[4..16].try_into().expect("Don't fail"),
+            magic_bytes: MagicBytes::from_bytes(message[0..4].try_into().expect("Don't fail")),
+            command: HeaderCommand::from_bytes(message[4..16].try_into().expect("Don't fail")),
             size: UInt::<LittleEndian, 4>::from_le_bytes(
                 message[16..20].try_into().expect("Don't fail"),
             ),

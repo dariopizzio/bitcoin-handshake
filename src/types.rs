@@ -1,7 +1,8 @@
-use std::{marker::PhantomData, net::Ipv4Addr, str::FromStr};
+use std::{fmt::Display, marker::PhantomData, net::Ipv4Addr, str::FromStr};
 
 //const HEADER_MAGIC_BYTES: [u8; 4] = [0xf9, 0xbe, 0xb4, 0xd9];
 
+#[derive(Debug)]
 pub enum MagicBytes {
     MAINNET = 0xF9BEB4D9,
 }
@@ -10,11 +11,22 @@ pub trait ToBytes<const N: usize> {
     fn to_bytes(&self) -> [u8; N];
 }
 
+pub trait FromBytes<const N: usize, T> {
+    fn from_bytes(bytes: [u8; N]) -> T;
+}
+
 impl ToBytes<4> for MagicBytes {
     fn to_bytes(&self) -> [u8; 4] {
         match self {
             MagicBytes::MAINNET => hex_to_bytes(MagicBytes::MAINNET),
         }
+    }
+}
+
+impl FromBytes<4, MagicBytes> for MagicBytes {
+    fn from_bytes(_bytes: [u8; 4]) -> MagicBytes {
+        // TODO fix
+        MagicBytes::MAINNET
     }
 }
 
@@ -28,6 +40,50 @@ fn hex_to_bytes(num: MagicBytes) -> [u8; 4] {
     );
 
     [b1, b2, b3, b4]
+}
+
+#[derive(Debug)]
+pub enum HeaderCommand {
+    VERSION,
+    VERACK,
+}
+
+impl FromStr for HeaderCommand {
+    type Err = (); // TODO fix
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "version" => Ok(HeaderCommand::VERSION),
+            "verack" => Ok(HeaderCommand::VERACK),
+            _ => Err(()),
+        }
+    }
+}
+
+impl ToBytes<12> for HeaderCommand {
+    fn to_bytes(&self) -> [u8; 12] {
+        match self {
+            HeaderCommand::VERSION => get_field::<12>("version".as_bytes()),
+            HeaderCommand::VERACK => get_field::<12>("verack".as_bytes()),
+        }
+    }
+}
+
+impl FromBytes<12, HeaderCommand> for HeaderCommand {
+    fn from_bytes(bytes: [u8; 12]) -> HeaderCommand {
+        let command = String::from_utf8(bytes.to_vec()).unwrap(); // TODO
+        let command = command.trim_matches(char::from(0)); // Remove trailing null
+        HeaderCommand::from_str(&command).unwrap() // TODO
+    }
+}
+
+impl Display for HeaderCommand {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            HeaderCommand::VERSION => write!(f, "version"),
+            HeaderCommand::VERACK => write!(f, "verack"),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -109,3 +165,9 @@ impl_uint!(4, u32, LittleEndian);
 impl_uint!(4, u32, BigEndian);
 impl_uint!(8, u64, LittleEndian);
 impl_uint!(16, u128, BigEndian);
+
+pub fn get_field<const N: usize>(bytes: &[u8]) -> [u8; N] {
+    let mut field: [u8; N] = [0; N];
+    field[0..bytes.len()].copy_from_slice(bytes);
+    field
+}
