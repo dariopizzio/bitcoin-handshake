@@ -1,5 +1,5 @@
 # bitcoin-handshake
-Bitcoin handshake in Rust
+Bitcoin handshake POC in Rust
 
 ## Bitcoin handshake specification
 https://developer.bitcoin.org/reference/p2p_networking.html
@@ -15,3 +15,4 @@ https://learnmeabitcoin.com/technical/networking/#handshake
 - Continue reading from the buffer after handshake (https://learnmeabitcoin.com/technical/networking/#receiving-messages)
 - Add Cli (and receive ip as parameter)
 - Tests
+- Improve Readme
