@@ -32,10 +32,10 @@ impl MessageHeader {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut message: Vec<u8> = vec![];
         // TODO ok()
-        message.write(&self.magic_bytes.to_bytes()).ok();
-        message.write(&self.command.to_bytes()).ok();
-        message.write(&self.size.to_bytes()).ok();
-        message.write(&self.checksum.to_bytes()).ok();
+        message.write_all(&self.magic_bytes.to_bytes()).ok();
+        message.write_all(&self.command.to_bytes()).ok();
+        message.write_all(&self.size.to_bytes()).ok();
+        message.write_all(&self.checksum.to_bytes()).ok();
 
         message
     }
@@ -69,6 +69,7 @@ pub struct VersionMessagePayload {
 }
 
 impl VersionMessagePayload {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         protocol_version: UInt<LittleEndian, 4>,
         services: [u8; 8],
@@ -96,34 +97,34 @@ impl VersionMessagePayload {
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut message: Vec<u8> = vec![];
         // TODO ok()
-        message.write(&self.protocol_version.to_bytes()).ok();
-        message.write(&self.services).ok();
-        message.write(&self.timestamp.to_bytes()).ok();
+        message.write_all(&self.protocol_version.to_bytes()).ok();
+        message.write_all(&self.services).ok();
+        message.write_all(&self.timestamp.to_bytes()).ok();
         message
-            .write(&self.recv_node_information.services.to_bytes())
+            .write_all(&self.recv_node_information.services.to_bytes())
             .ok();
         message
-            .write(&self.recv_node_information.ip_address.to_bytes())
+            .write_all(&self.recv_node_information.ip_address.to_bytes())
             .ok();
         message
-            .write(&self.recv_node_information.port.to_bytes())
+            .write_all(&self.recv_node_information.port.to_bytes())
             .ok();
         message
-            .write(&self.trans_node_information.services.to_bytes())
+            .write_all(&self.trans_node_information.services.to_bytes())
             .ok();
         message
-            .write(&self.trans_node_information.ip_address.to_bytes())
+            .write_all(&self.trans_node_information.ip_address.to_bytes())
             .ok();
         message
-            .write(&self.trans_node_information.port.to_bytes())
+            .write_all(&self.trans_node_information.port.to_bytes())
             .ok();
-        message.write(&self.nonce.to_bytes()).ok();
-        message.write(&self.user_agent_size).ok();
+        message.write_all(&self.nonce.to_bytes()).ok();
+        message.write_all(&self.user_agent_size).ok();
 
-        if (self.user_agent_size[0] as u8) > 0 {
-            message.write(self.user_agent.as_bytes()).ok();
+        if self.user_agent_size[0] > 0 {
+            message.write_all(self.user_agent.as_bytes()).ok();
         }
-        message.write(&self.start_height.to_bytes()).ok();
+        message.write_all(&self.start_height.to_bytes()).ok();
 
         message
     }
@@ -176,11 +177,11 @@ impl VersionMessagePayload {
 /// and take the first 4 bytes
 pub fn get_checksum(payload: &Vec<u8>) -> UInt<BigEndian, 4> {
     let mut hasher = Sha256::new();
-    hasher.update(&payload);
+    hasher.update(payload);
     let hash1 = hasher.finalize();
 
     let mut hasher = Sha256::new();
-    hasher.update(&hash1);
+    hasher.update(hash1);
     let checksum: [u8; 4] = hasher.finalize()[..4].try_into().unwrap(); // first 4 bytes
     UInt::<BigEndian, 4>::from_be_bytes(checksum) // TODO check BigEndian vs LittleEndian
 }

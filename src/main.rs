@@ -24,7 +24,7 @@ fn main() {
 
     let payload_message = get_payload_message_header();
     let version_header =
-        get_version_message_header(HeaderCommand::VERSION, &payload_message.to_bytes());
+        get_version_message_header(HeaderCommand::Version, &payload_message.to_bytes());
 
     println!("## SEND VERSION HEADER & PAYLOAD");
     write_bytes(&tcp_stream, &version_header.to_bytes());
@@ -58,7 +58,7 @@ fn main() {
     println!("parsed received message: {received_message:?}");
 
     println!("## SEND VERACK HEADER");
-    let version_header = get_version_message_header(HeaderCommand::VERACK, &vec![]);
+    let version_header = get_version_message_header(HeaderCommand::Verack, &vec![]);
 
     write_bytes(&tcp_stream, &version_header.to_bytes());
 
@@ -79,9 +79,9 @@ fn read_bytes(tcp_stream: &mut TcpStream, buffer: &mut [u8; 24]) -> usize {
     size
 }
 
-fn write_bytes(tcp_stream: &TcpStream, bytes: &Vec<u8>) {
+fn write_bytes(tcp_stream: &TcpStream, bytes: &[u8]) {
     let mut buf_writer = BufWriter::new(tcp_stream);
-    buf_writer.write(bytes).expect("write");
+    buf_writer.write_all(bytes).expect("write");
 }
 
 fn get_version_message_header(command: HeaderCommand, payload: &Vec<u8>) -> MessageHeader {
@@ -89,7 +89,7 @@ fn get_version_message_header(command: HeaderCommand, payload: &Vec<u8>) -> Mess
     let size = UInt::<LittleEndian, 4>::new(size);
     let checksum = get_checksum(payload);
 
-    MessageHeader::new(MagicBytes::MAINNET, command, size, checksum)
+    MessageHeader::new(MagicBytes::Mainnet, command, size, checksum)
 }
 
 fn get_payload_message_header() -> VersionMessagePayload {
