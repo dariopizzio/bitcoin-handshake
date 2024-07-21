@@ -2,12 +2,15 @@
 
 Bitcoin handshake POC in Rust
 
+The idea of ​​this POC is to use as few crates as possible (for that reason, I am not using the bitcoin crate to decode/encode the messages)
+
 ## Bitcoin handshake specification
 
 <https://developer.bitcoin.org/reference/p2p_networking.html>
 
 ### Another useful resource
 
+<https://en.bitcoin.it/wiki/Protocol_documentation>
 <https://learnmeabitcoin.com/technical/networking/#handshake>
 
 ## How to get a valid node IP address
