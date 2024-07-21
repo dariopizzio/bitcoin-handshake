@@ -2,7 +2,7 @@
 
 Bitcoin handshake POC in Rust
 
-The idea of ​​this POC is to use as few crates as possible (for that reason, I am not using the bitcoin crate to decode/encode the messages)
+The idea for ​​this POC was to use as few crates as possible (for that reason, I am not using the bitcoin crate to decode/encode the messages)
 
 ## Bitcoin handshake specification
 
