@@ -1,10 +1,17 @@
-use std::{fmt::Display, marker::PhantomData, net::Ipv4Addr, str::FromStr};
+use std::{
+    fmt::Display,
+    marker::PhantomData,
+    net::{AddrParseError, Ipv4Addr},
+    str::FromStr,
+};
+
+use thiserror::Error;
 
 //const HEADER_MAGIC_BYTES: [u8; 4] = [0xf9, 0xbe, 0xb4, 0xd9];
 
 #[derive(Debug)]
 pub enum MagicBytes {
-    Mainnet = 0xF9BEB4D9,
+    Mainnet = 0xF9BEB4D9, // Won't work on 32 bit arch
 }
 
 pub trait ToBytes<const N: usize> {
@@ -12,7 +19,7 @@ pub trait ToBytes<const N: usize> {
 }
 
 pub trait FromBytes<const N: usize, T> {
-    fn from_bytes(bytes: [u8; N]) -> T;
+    fn from_bytes(bytes: [u8; N]) -> Result<T, HandshakeError>;
 }
 
 impl ToBytes<4> for MagicBytes {
@@ -24,9 +31,9 @@ impl ToBytes<4> for MagicBytes {
 }
 
 impl FromBytes<4, MagicBytes> for MagicBytes {
-    fn from_bytes(_bytes: [u8; 4]) -> MagicBytes {
+    fn from_bytes(_bytes: [u8; 4]) -> Result<MagicBytes, HandshakeError> {
         // TODO fix
-        MagicBytes::Mainnet
+        Ok(MagicBytes::Mainnet)
     }
 }
 
@@ -73,10 +80,13 @@ impl ToBytes<12> for HeaderCommand {
 }
 
 impl FromBytes<12, HeaderCommand> for HeaderCommand {
-    fn from_bytes(bytes: [u8; 12]) -> HeaderCommand {
-        let command = String::from_utf8(bytes.to_vec()).unwrap(); // TODO
+    fn from_bytes(bytes: [u8; 12]) -> Result<HeaderCommand, HandshakeError> {
+        let command =
+            String::from_utf8(bytes.to_vec()).map_err(|_e| HandshakeError::ByteDecodingError)?;
         let command = command.trim_matches(char::from(0)); // Remove trailing null
-        HeaderCommand::from_str(command).unwrap() // TODO
+        let command =
+            HeaderCommand::from_str(command).map_err(|_e| HandshakeError::ByteDecodingError)?;
+        Ok(command)
     }
 }
 
@@ -98,16 +108,19 @@ pub struct NodeInformation {
 }
 
 impl NodeInformation {
-    pub fn new(services: u64, ip_address: &str, port: u16) -> Self {
+    pub fn new(services: u64, ip_address: &str, port: u16) -> Result<Self, HandshakeError> {
+        // TODO fix
         let ip_address = Ipv4Addr::from_str(ip_address)
-            .unwrap()
+            .map_err(HandshakeError::ParseError)?
             .to_ipv6_mapped()
-            .octets(); // TODO .octets().map(|b| b.to_be());
-        Self {
+            .octets();
+        let node_information = Self {
             services: UInt::<LittleEndian, 8>::new(services),
             ip_address: UInt::<BigEndian, 16>::from_be_bytes(ip_address),
             port: UInt::<BigEndian, 2>::new(port),
-        }
+        };
+
+        Ok(node_information)
     }
     pub fn from_bytes(
         services: UInt<LittleEndian, 8>,
@@ -174,4 +187,15 @@ pub fn get_field<const N: usize>(bytes: &[u8]) -> [u8; N] {
     let mut field: [u8; N] = [0; N];
     field[0..bytes.len()].copy_from_slice(bytes);
     field
+}
+
+#[allow(clippy::enum_variant_names)]
+#[derive(Error, Debug)]
+pub enum HandshakeError {
+    #[error("Parse error: {0}")]
+    ParseError(AddrParseError),
+    #[error("There was an error decoding bytes")]
+    ByteDecodingError,
+    #[error("There was an error calculating the checksum")]
+    ChecksumError,
 }

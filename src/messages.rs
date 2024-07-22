@@ -3,7 +3,8 @@ use std::io::Write;
 use sha2::{Digest, Sha256};
 
 use crate::types::{
-    BigEndian, FromBytes, HeaderCommand, LittleEndian, MagicBytes, NodeInformation, ToBytes, UInt,
+    BigEndian, FromBytes, HandshakeError, HeaderCommand, LittleEndian, MagicBytes, NodeInformation,
+    ToBytes, UInt,
 };
 
 #[derive(Debug)]
@@ -40,18 +41,19 @@ impl MessageHeader {
         message
     }
 
-    pub fn from_bytes(message: [u8; 24]) -> Self {
-        Self {
+    pub fn from_bytes(message: [u8; 24]) -> Result<Self, HandshakeError> {
+        let message = Self {
             // TODO expect
-            magic_bytes: MagicBytes::from_bytes(message[0..4].try_into().expect("Don't fail")),
-            command: HeaderCommand::from_bytes(message[4..16].try_into().expect("Don't fail")),
+            magic_bytes: MagicBytes::from_bytes(message[0..4].try_into().expect("Don't fail"))?,
+            command: HeaderCommand::from_bytes(message[4..16].try_into().expect("Don't fail"))?,
             size: UInt::<LittleEndian, 4>::from_le_bytes(
                 message[16..20].try_into().expect("Don't fail"),
             ),
             checksum: UInt::<BigEndian, 4>::from_be_bytes(
                 message[20..24].try_into().expect("Don't fail"),
             ),
-        }
+        };
+        Ok(message)
     }
 }
 
@@ -175,13 +177,16 @@ impl VersionMessagePayload {
 ///
 /// To get the checksum, you need to double hash the payload
 /// and take the first 4 bytes
-pub fn get_checksum(payload: &Vec<u8>) -> UInt<BigEndian, 4> {
+pub fn get_checksum(payload: &Vec<u8>) -> Result<UInt<BigEndian, 4>, HandshakeError> {
     let mut hasher = Sha256::new();
     hasher.update(payload);
     let hash1 = hasher.finalize();
 
     let mut hasher = Sha256::new();
     hasher.update(hash1);
-    let checksum: [u8; 4] = hasher.finalize()[..4].try_into().unwrap(); // first 4 bytes
-    UInt::<BigEndian, 4>::from_be_bytes(checksum) // TODO check BigEndian vs LittleEndian
+    let checksum: [u8; 4] = hasher.finalize()[..4]
+        .try_into()
+        .map_err(|_e| HandshakeError::ChecksumError)?; // first 4 bytes
+    let checksum = UInt::<BigEndian, 4>::from_be_bytes(checksum); // TODO check BigEndian vs LittleEndian
+    Ok(checksum)
 }

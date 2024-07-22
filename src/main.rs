@@ -6,7 +6,7 @@ use std::{
 
 use chrono::Utc;
 use messages::{get_checksum, MessageHeader, VersionMessagePayload};
-use types::{HeaderCommand, LittleEndian, MagicBytes, NodeInformation, UInt};
+use types::{HandshakeError, HeaderCommand, LittleEndian, MagicBytes, NodeInformation, UInt};
 
 mod messages;
 mod types;
@@ -22,9 +22,11 @@ const HEADER_MESSAGE_LENGHT: usize = 24;
 fn main() {
     let mut tcp_stream = TcpStream::connect(format!("{REMOTE_IP}:{MAINNET_PORT}")).unwrap();
 
-    let payload_message = get_payload_message_header();
+    let payload_message =
+        get_payload_message_header().expect("There was an error building the version payload");
     let version_header =
-        get_version_message_header(HeaderCommand::Version, &payload_message.to_bytes());
+        get_version_message_header(HeaderCommand::Version, &payload_message.to_bytes())
+            .expect("There was an error building the version header");
 
     println!("## SEND VERSION HEADER & PAYLOAD");
     write_bytes(&tcp_stream, &version_header.to_bytes());
@@ -34,7 +36,8 @@ fn main() {
     let mut buffer = [0u8; HEADER_MESSAGE_LENGHT];
     read_bytes(&mut tcp_stream, &mut buffer);
 
-    let received_message = MessageHeader::from_bytes(buffer);
+    let received_message =
+        MessageHeader::from_bytes(buffer).expect("There was an error message while decoding");
     println!("parsed received message: {received_message:?}");
 
     println!("## READ VERSION PAYLOAD");
@@ -58,7 +61,8 @@ fn main() {
     println!("parsed received message: {received_message:?}");
 
     println!("## SEND VERACK HEADER");
-    let version_header = get_version_message_header(HeaderCommand::Verack, &vec![]);
+    let version_header = get_version_message_header(HeaderCommand::Verack, &vec![])
+        .expect("There was an error building the version header");
 
     write_bytes(&tcp_stream, &version_header.to_bytes());
 
@@ -84,26 +88,30 @@ fn write_bytes(tcp_stream: &TcpStream, bytes: &[u8]) {
     buf_writer.write_all(bytes).expect("write");
 }
 
-fn get_version_message_header(command: HeaderCommand, payload: &Vec<u8>) -> MessageHeader {
+fn get_version_message_header(
+    command: HeaderCommand,
+    payload: &Vec<u8>,
+) -> Result<MessageHeader, HandshakeError> {
     let size = payload.len() as u32;
     let size = UInt::<LittleEndian, 4>::new(size);
-    let checksum = get_checksum(payload);
+    let checksum = get_checksum(payload)?;
 
-    MessageHeader::new(MagicBytes::Mainnet, command, size, checksum)
+    let message_header = MessageHeader::new(MagicBytes::Mainnet, command, size, checksum);
+    Ok(message_header)
 }
 
-fn get_payload_message_header() -> VersionMessagePayload {
+fn get_payload_message_header() -> Result<VersionMessagePayload, HandshakeError> {
     let protocol_version = UInt::<LittleEndian, 4>::new(PROTOCOL_VERSION);
     let services: [u8; 8] = [0; 8];
     let epoch_time = Utc::now().timestamp();
     let time = UInt::<LittleEndian, 8>::new(epoch_time as u64);
-    let recv_node_information = NodeInformation::new(0, REMOTE_IP, MAINNET_PORT);
-    let trans_node_information = NodeInformation::new(0, LOCAL_IP, MAINNET_PORT);
+    let recv_node_information = NodeInformation::new(0, REMOTE_IP, MAINNET_PORT)?;
+    let trans_node_information = NodeInformation::new(0, LOCAL_IP, MAINNET_PORT)?;
     let nonce = UInt::<LittleEndian, 8>::new(0);
     let user_agent: [u8; 1] = [0; 1];
     let last_block = UInt::<LittleEndian, 4>::new(0);
 
-    VersionMessagePayload::new(
+    let message = VersionMessagePayload::new(
         protocol_version,
         services,
         time,
@@ -113,5 +121,7 @@ fn get_payload_message_header() -> VersionMessagePayload {
         user_agent,
         "".to_string(),
         last_block,
-    )
+    );
+
+    Ok(message)
 }
