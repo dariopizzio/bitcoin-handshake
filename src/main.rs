@@ -21,14 +21,14 @@ const MAINNET_PORT: u16 = 8333;
 
 const HEADER_MESSAGE_LENGHT: usize = 24;
 
-fn main() {
+type Result<T> = std::result::Result<T, HandshakeError>;
+
+fn main() -> Result<()> {
     let mut tcp_stream = TcpStream::connect(format!("{REMOTE_IP}:{MAINNET_PORT}")).unwrap();
 
-    let payload_message =
-        get_payload_message_header().expect("There was an error building the version payload");
+    let payload_message = get_payload_message_header()?;
     let version_header =
-        get_version_message_header(HeaderCommand::Version, &payload_message.to_bytes())
-            .expect("There was an error building the version header");
+        get_version_message_header(HeaderCommand::Version, &payload_message.to_bytes())?;
 
     println!("## SEND VERSION HEADER & PAYLOAD");
     write_bytes(&tcp_stream, &version_header.to_bytes());
@@ -36,10 +36,9 @@ fn main() {
 
     println!("## READ VERSION HEADER");
     let mut buffer = [0u8; HEADER_MESSAGE_LENGHT];
-    read_bytes(&mut tcp_stream, &mut buffer);
+    read_bytes(&mut tcp_stream, &mut buffer)?;
 
-    let received_message =
-        MessageHeader::from_bytes(buffer).expect("There was an error message while decoding");
+    let received_message = MessageHeader::from_bytes(buffer)?;
     println!("parsed received message: {received_message:?}");
 
     println!("## READ VERSION PAYLOAD");
@@ -57,14 +56,13 @@ fn main() {
 
     println!("## READ VERACK HEADER");
     let mut buffer = [0u8; HEADER_MESSAGE_LENGHT];
-    read_bytes(&mut tcp_stream, &mut buffer);
+    read_bytes(&mut tcp_stream, &mut buffer)?;
 
     let received_message = MessageHeader::from_bytes(buffer);
     println!("parsed received message: {received_message:?}");
 
     println!("## SEND VERACK HEADER");
-    let version_header = get_version_message_header(HeaderCommand::Verack, &vec![])
-        .expect("There was an error building the version header");
+    let version_header = get_version_message_header(HeaderCommand::Verack, &vec![])?;
 
     write_bytes(&tcp_stream, &version_header.to_bytes());
 
@@ -72,17 +70,19 @@ fn main() {
 
     println!("## READ NEW HEADER MESSAGE");
     let mut buffer = [0u8; HEADER_MESSAGE_LENGHT];
-    read_bytes(&mut tcp_stream, &mut buffer);
+    read_bytes(&mut tcp_stream, &mut buffer)?;
 
     let received_message = MessageHeader::from_bytes(buffer);
     println!("parsed received message: {received_message:?}");
+
+    Ok(())
 }
 
-fn read_bytes(tcp_stream: &mut TcpStream, buffer: &mut [u8; 24]) -> usize {
+fn read_bytes(tcp_stream: &mut TcpStream, buffer: &mut [u8; 24]) -> Result<usize> {
     // TODO use BufReader
-    let size = tcp_stream.read(buffer).expect("expect");
+    let size = tcp_stream.read(buffer)?;
     println!("Size: {size} | Response: {buffer:?}");
-    size
+    Ok(size)
 }
 
 fn write_bytes(tcp_stream: &TcpStream, bytes: &[u8]) {
@@ -90,10 +90,7 @@ fn write_bytes(tcp_stream: &TcpStream, bytes: &[u8]) {
     buf_writer.write_all(bytes).expect("write");
 }
 
-fn get_version_message_header(
-    command: HeaderCommand,
-    payload: &Vec<u8>,
-) -> Result<MessageHeader, HandshakeError> {
+fn get_version_message_header(command: HeaderCommand, payload: &Vec<u8>) -> Result<MessageHeader> {
     let size = payload.len() as u32;
     let size = UInt::<LittleEndian, 4>::new(size);
     let checksum = get_checksum(payload)?;
@@ -102,7 +99,7 @@ fn get_version_message_header(
     Ok(message_header)
 }
 
-fn get_payload_message_header() -> Result<VersionMessagePayload, HandshakeError> {
+fn get_payload_message_header() -> Result<VersionMessagePayload> {
     let protocol_version = UInt::<LittleEndian, 4>::new(PROTOCOL_VERSION);
     let services: [u8; 8] = [0; 8];
     let epoch_time = Utc::now().timestamp();

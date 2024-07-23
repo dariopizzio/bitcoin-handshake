@@ -8,6 +8,7 @@ use crate::{
         BigEndian, FromBytes, HeaderCommand, LittleEndian, MagicBytes, NodeInformation, ToBytes,
         UInt,
     },
+    Result,
 };
 
 #[derive(Debug)]
@@ -44,7 +45,7 @@ impl MessageHeader {
         message
     }
 
-    pub fn from_bytes(message: [u8; 24]) -> Result<Self, HandshakeError> {
+    pub fn from_bytes(message: [u8; 24]) -> Result<Self> {
         let message = Self {
             magic_bytes: MagicBytes::from_bytes(message[0..4].try_into()?)?,
             command: HeaderCommand::from_bytes(message[4..16].try_into()?)?,
@@ -129,7 +130,7 @@ impl VersionMessagePayload {
         message
     }
 
-    pub fn from_bytes(message: Vec<u8>) -> Result<Self, HandshakeError> {
+    pub fn from_bytes(message: Vec<u8>) -> Result<Self> {
         let user_agent_size: [u8; 1] = message[80..81].try_into()?;
         let size = i8::from_le_bytes(user_agent_size);
         let end_user_agent = 81 + size as usize;
@@ -168,7 +169,7 @@ impl VersionMessagePayload {
 ///
 /// To get the checksum, you need to double hash the payload
 /// and take the first 4 bytes
-pub fn get_checksum(payload: &Vec<u8>) -> Result<UInt<BigEndian, 4>, HandshakeError> {
+pub fn get_checksum(payload: &Vec<u8>) -> Result<UInt<BigEndian, 4>> {
     let mut hasher = Sha256::new();
     hasher.update(payload);
     let hash1 = hasher.finalize();

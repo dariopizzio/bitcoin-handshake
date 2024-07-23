@@ -1,6 +1,7 @@
 use std::{fmt::Display, marker::PhantomData, net::Ipv4Addr, str::FromStr};
 
 use crate::errors::HandshakeError;
+use crate::Result;
 
 //const HEADER_MAGIC_BYTES: [u8; 4] = [0xf9, 0xbe, 0xb4, 0xd9];
 
@@ -14,7 +15,7 @@ pub trait ToBytes<const N: usize> {
 }
 
 pub trait FromBytes<const N: usize, T> {
-    fn from_bytes(bytes: [u8; N]) -> Result<T, HandshakeError>;
+    fn from_bytes(bytes: [u8; N]) -> Result<T>;
 }
 
 impl ToBytes<4> for MagicBytes {
@@ -26,7 +27,7 @@ impl ToBytes<4> for MagicBytes {
 }
 
 impl FromBytes<4, MagicBytes> for MagicBytes {
-    fn from_bytes(_bytes: [u8; 4]) -> Result<MagicBytes, HandshakeError> {
+    fn from_bytes(_bytes: [u8; 4]) -> Result<MagicBytes> {
         // TODO fix
         Ok(MagicBytes::Mainnet)
     }
@@ -54,7 +55,7 @@ pub enum HeaderCommand {
 impl FromStr for HeaderCommand {
     type Err = HandshakeError;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
             "version" => Ok(HeaderCommand::Version),
             "verack" => Ok(HeaderCommand::Verack),
@@ -75,7 +76,7 @@ impl ToBytes<12> for HeaderCommand {
 }
 
 impl FromBytes<12, HeaderCommand> for HeaderCommand {
-    fn from_bytes(bytes: [u8; 12]) -> Result<HeaderCommand, HandshakeError> {
+    fn from_bytes(bytes: [u8; 12]) -> Result<HeaderCommand> {
         let command = String::from_utf8(bytes.to_vec())?;
         let command = command.trim_matches(char::from(0)); // Remove trailing null
         let command = HeaderCommand::from_str(command)?;
@@ -101,7 +102,7 @@ pub struct NodeInformation {
 }
 
 impl NodeInformation {
-    pub fn new(services: u64, ip_address: &str, port: u16) -> Result<Self, HandshakeError> {
+    pub fn new(services: u64, ip_address: &str, port: u16) -> Result<Self> {
         // TODO fix
         let ip_address = Ipv4Addr::from_str(ip_address)
             .map_err(HandshakeError::ParseError)?
