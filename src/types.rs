@@ -1,11 +1,8 @@
-use std::{
-    fmt::Display,
-    marker::PhantomData,
-    net::{AddrParseError, Ipv4Addr},
-    str::FromStr,
-};
+use std::{fmt::Display, marker::PhantomData, net::Ipv4Addr, str::FromStr, string::FromUtf8Error};
 
-use thiserror::Error;
+use anyhow::anyhow;
+
+use crate::errors::HandshakeError;
 
 //const HEADER_MAGIC_BYTES: [u8; 4] = [0xf9, 0xbe, 0xb4, 0xd9];
 
@@ -57,14 +54,14 @@ pub enum HeaderCommand {
 }
 
 impl FromStr for HeaderCommand {
-    type Err = (); // TODO fix
+    type Err = HandshakeError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "version" => Ok(HeaderCommand::Version),
             "verack" => Ok(HeaderCommand::Verack),
             "sendcmpct" => Ok(HeaderCommand::Sendcmpct),
-            _ => Err(()),
+            _ => Err(HandshakeError::InvalidHeaderCommand),
         }
     }
 }
@@ -81,11 +78,10 @@ impl ToBytes<12> for HeaderCommand {
 
 impl FromBytes<12, HeaderCommand> for HeaderCommand {
     fn from_bytes(bytes: [u8; 12]) -> Result<HeaderCommand, HandshakeError> {
-        let command =
-            String::from_utf8(bytes.to_vec()).map_err(|_e| HandshakeError::ByteDecodingError)?;
+        let command = String::from_utf8(bytes.to_vec())
+            .map_err(|e: FromUtf8Error| HandshakeError::ByteDecodingError(anyhow!(e)))?;
         let command = command.trim_matches(char::from(0)); // Remove trailing null
-        let command =
-            HeaderCommand::from_str(command).map_err(|_e| HandshakeError::ByteDecodingError)?;
+        let command = HeaderCommand::from_str(command)?;
         Ok(command)
     }
 }
@@ -187,15 +183,4 @@ pub fn get_field<const N: usize>(bytes: &[u8]) -> [u8; N] {
     let mut field: [u8; N] = [0; N];
     field[0..bytes.len()].copy_from_slice(bytes);
     field
-}
-
-#[allow(clippy::enum_variant_names)]
-#[derive(Error, Debug)]
-pub enum HandshakeError {
-    #[error("Parse error: {0}")]
-    ParseError(AddrParseError),
-    #[error("There was an error decoding bytes")]
-    ByteDecodingError,
-    #[error("There was an error calculating the checksum")]
-    ChecksumError,
 }

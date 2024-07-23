@@ -1,3 +1,7 @@
+mod errors;
+mod messages;
+mod types;
+
 use std::io::{BufRead, BufReader, BufWriter};
 use std::{
     io::{Read, Write},
@@ -5,11 +9,9 @@ use std::{
 };
 
 use chrono::Utc;
+use errors::HandshakeError;
 use messages::{get_checksum, MessageHeader, VersionMessagePayload};
-use types::{HandshakeError, HeaderCommand, LittleEndian, MagicBytes, NodeInformation, UInt};
-
-mod messages;
-mod types;
+use types::{HeaderCommand, LittleEndian, MagicBytes, NodeInformation, UInt};
 
 const PROTOCOL_VERSION: u32 = 70015;
 
