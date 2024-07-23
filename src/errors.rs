@@ -19,6 +19,8 @@ pub enum HandshakeError {
     InvalidHeaderCommand,
     #[error("There was an error while reading from the socket")]
     BufferReadError(Error),
+    #[error("There was an error while write to the socket")]
+    BufferWriteError(Error),
 }
 
 impl From<TryFromSliceError> for HandshakeError {
@@ -30,11 +32,5 @@ impl From<TryFromSliceError> for HandshakeError {
 impl From<FromUtf8Error> for HandshakeError {
     fn from(e: FromUtf8Error) -> Self {
         HandshakeError::ByteDecodingError(anyhow!(e))
-    }
-}
-
-impl From<Error> for HandshakeError {
-    fn from(e: Error) -> Self {
-        HandshakeError::BufferReadError(e)
     }
 }

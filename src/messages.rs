@@ -146,7 +146,6 @@ impl VersionMessagePayload {
             UInt::<BigEndian, 2>::from_be_bytes(message[70..72].try_into()?),
         );
         let message = Self {
-            // TODO expect
             protocol_version: UInt::<LittleEndian, 4>::from_le_bytes(message[0..4].try_into()?),
             services: message[4..12].try_into()?,
             timestamp: UInt::<LittleEndian, 8>::from_le_bytes(message[12..20].try_into()?),

@@ -31,8 +31,8 @@ fn main() -> Result<()> {
         get_version_message_header(HeaderCommand::Version, &payload_message.to_bytes())?;
 
     println!("## SEND VERSION HEADER & PAYLOAD");
-    write_bytes(&tcp_stream, &version_header.to_bytes());
-    write_bytes(&tcp_stream, &payload_message.to_bytes());
+    write_bytes(&tcp_stream, &version_header.to_bytes())?;
+    write_bytes(&tcp_stream, &payload_message.to_bytes())?;
 
     println!("## READ VERSION HEADER");
     let mut buffer = [0u8; HEADER_MESSAGE_LENGHT];
@@ -45,7 +45,7 @@ fn main() -> Result<()> {
     let size = u32::from_le_bytes(received_message.size.to_bytes());
 
     let mut br = BufReader::new(&tcp_stream);
-    let buffer = br.fill_buf().unwrap();
+    let buffer = br.fill_buf().map_err(HandshakeError::BufferReadError)?;
     println!("Size: {size} | Response: {buffer:?}");
 
     let received_message = VersionMessagePayload::from_bytes(buffer.to_vec());
@@ -64,7 +64,7 @@ fn main() -> Result<()> {
     println!("## SEND VERACK HEADER");
     let version_header = get_version_message_header(HeaderCommand::Verack, &vec![])?;
 
-    write_bytes(&tcp_stream, &version_header.to_bytes());
+    write_bytes(&tcp_stream, &version_header.to_bytes())?;
 
     println!("HANDSHAKE COMPLETED!");
 
@@ -80,14 +80,19 @@ fn main() -> Result<()> {
 
 fn read_bytes(tcp_stream: &mut TcpStream, buffer: &mut [u8; 24]) -> Result<usize> {
     // TODO use BufReader
-    let size = tcp_stream.read(buffer)?;
+    let size = tcp_stream
+        .read(buffer)
+        .map_err(HandshakeError::BufferReadError)?;
     println!("Size: {size} | Response: {buffer:?}");
     Ok(size)
 }
 
-fn write_bytes(tcp_stream: &TcpStream, bytes: &[u8]) {
+fn write_bytes(tcp_stream: &TcpStream, bytes: &[u8]) -> Result<()> {
     let mut buf_writer = BufWriter::new(tcp_stream);
-    buf_writer.write_all(bytes).expect("write");
+    buf_writer
+        .write_all(bytes)
+        .map_err(HandshakeError::BufferWriteError)?;
+    Ok(())
 }
 
 fn get_version_message_header(command: HeaderCommand, payload: &Vec<u8>) -> Result<MessageHeader> {
