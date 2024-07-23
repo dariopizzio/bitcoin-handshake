@@ -1,5 +1,7 @@
-use std::net::AddrParseError;
+use std::string::FromUtf8Error;
+use std::{array::TryFromSliceError, net::AddrParseError};
 
+use anyhow::anyhow;
 use anyhow::Error;
 use thiserror::Error;
 
@@ -14,4 +16,16 @@ pub enum HandshakeError {
     ChecksumError,
     #[error("Invalid header command")]
     InvalidHeaderCommand,
+}
+
+impl From<TryFromSliceError> for HandshakeError {
+    fn from(e: TryFromSliceError) -> Self {
+        HandshakeError::ByteDecodingError(anyhow!(e))
+    }
+}
+
+impl From<FromUtf8Error> for HandshakeError {
+    fn from(e: FromUtf8Error) -> Self {
+        HandshakeError::ByteDecodingError(anyhow!(e))
+    }
 }

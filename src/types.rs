@@ -1,6 +1,4 @@
-use std::{fmt::Display, marker::PhantomData, net::Ipv4Addr, str::FromStr, string::FromUtf8Error};
-
-use anyhow::anyhow;
+use std::{fmt::Display, marker::PhantomData, net::Ipv4Addr, str::FromStr};
 
 use crate::errors::HandshakeError;
 
@@ -78,8 +76,7 @@ impl ToBytes<12> for HeaderCommand {
 
 impl FromBytes<12, HeaderCommand> for HeaderCommand {
     fn from_bytes(bytes: [u8; 12]) -> Result<HeaderCommand, HandshakeError> {
-        let command = String::from_utf8(bytes.to_vec())
-            .map_err(|e: FromUtf8Error| HandshakeError::ByteDecodingError(anyhow!(e)))?;
+        let command = String::from_utf8(bytes.to_vec())?;
         let command = command.trim_matches(char::from(0)); // Remove trailing null
         let command = HeaderCommand::from_str(command)?;
         Ok(command)

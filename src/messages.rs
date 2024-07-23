@@ -1,6 +1,5 @@
-use std::{array::TryFromSliceError, io::Write, string::FromUtf8Error};
+use std::io::Write;
 
-use anyhow::anyhow;
 use sha2::{Digest, Sha256};
 
 use crate::{
@@ -47,15 +46,10 @@ impl MessageHeader {
 
     pub fn from_bytes(message: [u8; 24]) -> Result<Self, HandshakeError> {
         let message = Self {
-            // TODO expect
-            magic_bytes: MagicBytes::from_bytes(message[0..4].try_into().expect("Don't fail"))?,
-            command: HeaderCommand::from_bytes(message[4..16].try_into().expect("Don't fail"))?,
-            size: UInt::<LittleEndian, 4>::from_le_bytes(
-                message[16..20].try_into().expect("Don't fail"),
-            ),
-            checksum: UInt::<BigEndian, 4>::from_be_bytes(
-                message[20..24].try_into().expect("Don't fail"),
-            ),
+            magic_bytes: MagicBytes::from_bytes(message[0..4].try_into()?)?,
+            command: HeaderCommand::from_bytes(message[4..16].try_into()?)?,
+            size: UInt::<LittleEndian, 4>::from_le_bytes(message[16..20].try_into()?),
+            checksum: UInt::<BigEndian, 4>::from_be_bytes(message[20..24].try_into()?),
         };
         Ok(message)
     }
@@ -136,69 +130,35 @@ impl VersionMessagePayload {
     }
 
     pub fn from_bytes(message: Vec<u8>) -> Result<Self, HandshakeError> {
-        let user_agent_size: [u8; 1] = message[80..81]
-            .try_into()
-            .map_err(|e: TryFromSliceError| HandshakeError::ByteDecodingError(anyhow!(e)))?;
+        let user_agent_size: [u8; 1] = message[80..81].try_into()?;
         let size = i8::from_le_bytes(user_agent_size);
         let end_user_agent = 81 + size as usize;
 
-        let recv_node_information =
-            NodeInformation::from_bytes(
-                UInt::<LittleEndian, 8>::from_le_bytes(message[20..28].try_into().map_err(
-                    |e: TryFromSliceError| HandshakeError::ByteDecodingError(anyhow!(e)),
-                )?),
-                UInt::<BigEndian, 16>::from_be_bytes(message[28..44].try_into().map_err(
-                    |e: TryFromSliceError| HandshakeError::ByteDecodingError(anyhow!(e)),
-                )?),
-                UInt::<BigEndian, 2>::from_be_bytes(message[44..46].try_into().map_err(
-                    |e: TryFromSliceError| HandshakeError::ByteDecodingError(anyhow!(e)),
-                )?),
-            );
-        let trans_node_information =
-            NodeInformation::from_bytes(
-                UInt::<LittleEndian, 8>::from_le_bytes(message[46..54].try_into().map_err(
-                    |e: TryFromSliceError| HandshakeError::ByteDecodingError(anyhow!(e)),
-                )?),
-                UInt::<BigEndian, 16>::from_be_bytes(message[54..70].try_into().map_err(
-                    |e: TryFromSliceError| HandshakeError::ByteDecodingError(anyhow!(e)),
-                )?),
-                UInt::<BigEndian, 2>::from_be_bytes(message[70..72].try_into().map_err(
-                    |e: TryFromSliceError| HandshakeError::ByteDecodingError(anyhow!(e)),
-                )?),
-            );
-        let message =
-            Self {
-                // TODO expect
-                protocol_version: UInt::<LittleEndian, 4>::from_le_bytes(
-                    message[0..4].try_into().map_err(|e: TryFromSliceError| {
-                        HandshakeError::ByteDecodingError(anyhow!(e))
-                    })?,
-                ),
-                services: message[4..12].try_into().map_err(|e: TryFromSliceError| {
-                    HandshakeError::ByteDecodingError(anyhow!(e))
-                })?,
-                timestamp: UInt::<LittleEndian, 8>::from_le_bytes(
-                    message[12..20].try_into().map_err(|e: TryFromSliceError| {
-                        HandshakeError::ByteDecodingError(anyhow!(e))
-                    })?,
-                ),
-                recv_node_information,
-                trans_node_information,
-                nonce: UInt::<LittleEndian, 8>::from_le_bytes(message[72..80].try_into().map_err(
-                    |e: TryFromSliceError| HandshakeError::ByteDecodingError(anyhow!(e)),
-                )?),
-                user_agent_size,
-                user_agent: String::from_utf8(message[81..end_user_agent].to_vec())
-                    .map_err(|e: FromUtf8Error| HandshakeError::ByteDecodingError(anyhow!(e)))?,
-                start_height: UInt::<LittleEndian, 4>::from_le_bytes(
-                    message[end_user_agent..end_user_agent + 4]
-                        .try_into()
-                        .map_err(|e: TryFromSliceError| {
-                            HandshakeError::ByteDecodingError(anyhow!(e))
-                        })?,
-                ),
-                //add relay field as optional
-            };
+        let recv_node_information = NodeInformation::from_bytes(
+            UInt::<LittleEndian, 8>::from_le_bytes(message[20..28].try_into()?),
+            UInt::<BigEndian, 16>::from_be_bytes(message[28..44].try_into()?),
+            UInt::<BigEndian, 2>::from_be_bytes(message[44..46].try_into()?),
+        );
+        let trans_node_information = NodeInformation::from_bytes(
+            UInt::<LittleEndian, 8>::from_le_bytes(message[46..54].try_into()?),
+            UInt::<BigEndian, 16>::from_be_bytes(message[54..70].try_into()?),
+            UInt::<BigEndian, 2>::from_be_bytes(message[70..72].try_into()?),
+        );
+        let message = Self {
+            // TODO expect
+            protocol_version: UInt::<LittleEndian, 4>::from_le_bytes(message[0..4].try_into()?),
+            services: message[4..12].try_into()?,
+            timestamp: UInt::<LittleEndian, 8>::from_le_bytes(message[12..20].try_into()?),
+            recv_node_information,
+            trans_node_information,
+            nonce: UInt::<LittleEndian, 8>::from_le_bytes(message[72..80].try_into()?),
+            user_agent_size,
+            user_agent: String::from_utf8(message[81..end_user_agent].to_vec())?,
+            start_height: UInt::<LittleEndian, 4>::from_le_bytes(
+                message[end_user_agent..end_user_agent + 4].try_into()?,
+            ),
+            //add relay field as optional
+        };
 
         Ok(message)
     }
